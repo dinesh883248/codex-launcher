@@ -186,7 +186,9 @@ func processEvent(event codexEvent) string {
 				return result
 			}
 		case "agent_message":
-			return fmt.Sprintf("Response: %s", truncate(item.Text, 200))
+			// don't truncate final response - it's important
+			text := strings.ReplaceAll(item.Text, "\n", " ")
+			return fmt.Sprintf("Response: %s", strings.TrimSpace(text))
 		case "error":
 			return fmt.Sprintf("Error: %s", truncate(item.Message, 100))
 		}
