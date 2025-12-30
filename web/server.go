@@ -80,11 +80,6 @@ func (s *Server) HandleRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/requests/") {
-		// check if it's a content request
-		if strings.HasSuffix(r.URL.Path, "/content") || strings.HasSuffix(r.URL.Path, "/content/") {
-			s.HandleContent(w, r)
-			return
-		}
 		s.HandleResponse(w, r)
 		return
 	}
@@ -172,60 +167,48 @@ func (s *Server) HandleResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page := parseInt(r.URL.Query().Get("page"), 1)
+	linesPerPage := 50
+	offset := (page - 1) * linesPerPage
+
+	lines, total, err := s.svc.GetOutputLines(r.Context(), id, linesPerPage, offset)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	pages := (total + linesPerPage - 1) / linesPerPage
+	if pages < 1 {
+		pages = 1
+	}
+
+	// reverse lines to show oldest first (chronological order)
+	outputRows := make([]OutputRow, 0, len(lines))
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := lines[i]
+		outputRows = append(outputRows, OutputRow{
+			LineNum:    line.LineNum,
+			Content:    line.Content,
+			ShowSpacer: i > 0,
+		})
+	}
+
+	pageNumbers := make([]PageNumber, 0, 5)
+	for i := 1; i <= 5; i++ {
+		pageNumbers = append(pageNumbers, PageNumber{Value: i, HasSpacer: i < 5})
+	}
+
 	data := ResponseView{
-		CSS:       s.css,
-		RequestID: req.ID,
-		Prompt:    req.Prompt,
-		Status:    req.Status,
+		CSS:         s.css,
+		RequestID:   req.ID,
+		Prompt:      req.Prompt,
+		Status:      req.Status,
+		Lines:       outputRows,
+		PageNumbers: pageNumbers,
+		Page:        page,
+		Pages:       pages,
 	}
 	if err := s.templates.ExecuteTemplate(w, "response", data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-type ContentView struct {
-	Lines []string
-}
-
-func (s *Server) HandleContent(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	// extract ID from /requests/{id}/content
-	path := strings.TrimPrefix(r.URL.Path, "/requests/")
-	path = strings.TrimSuffix(path, "/content/")
-	path = strings.TrimSuffix(path, "/content")
-	id, err := strconv.ParseInt(path, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	_, ok, err := s.svc.GetRequest(r.Context(), id)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	// get all output lines
-	lines, _, err := s.svc.GetOutputLines(r.Context(), id, 1000, 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// reverse to chronological order and extract content
-	content := make([]string, 0, len(lines))
-	for i := len(lines) - 1; i >= 0; i-- {
-		content = append(content, lines[i].Content)
-	}
-
-	data := ContentView{Lines: content}
-	if err := s.templates.ExecuteTemplate(w, "content", data); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

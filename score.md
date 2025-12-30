@@ -18,4 +18,3 @@ design_checks/check_head_css.py: 212
 design_checks/check_td_nbsp_pure.py: 89
 design_checks/check_attributes.py: 268
 count_bytecode.py: 84
-pyramid.py: 40
