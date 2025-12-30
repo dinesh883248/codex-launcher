@@ -182,12 +182,14 @@ func (s *Server) HandleResponse(w http.ResponseWriter, r *http.Request) {
 		pages = 1
 	}
 
+	// reverse lines to show oldest first (chronological order)
 	outputRows := make([]OutputRow, 0, len(lines))
-	for i, line := range lines {
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := lines[i]
 		outputRows = append(outputRows, OutputRow{
 			LineNum:    line.LineNum,
 			Content:    line.Content,
-			ShowSpacer: i < len(lines)-1,
+			ShowSpacer: i > 0,
 		})
 	}
 
