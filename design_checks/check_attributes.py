@@ -17,7 +17,7 @@ allowed_attrs = {
     "table": {"style", "id"},
     "col": {"style"},
     "button": {"type", "disabled"},
-    "input": {"name", "type", "value", "placeholder", "disabled"},
+    "input": {"name", "type", "value", "placeholder", "disabled", "autofocus"},
     "meta": {"http-equiv", "content", "charset", "name"},
     "textarea": {"name", "hidden", "rows", "disabled"},
     "a": {"href", "class"},
