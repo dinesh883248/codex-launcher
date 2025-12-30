@@ -174,27 +174,12 @@ func processEvent(event codexEvent) string {
 		switch item.Type {
 		case "reasoning":
 			return fmt.Sprintf("Thinking: %s", truncate(item.Text, 100))
-		case "command_execution":
-			if item.Status == "completed" {
-				result := fmt.Sprintf("$ %s", item.Command)
-				if item.AggregatedOutput != "" {
-					result += fmt.Sprintf(" -> %s", truncate(item.AggregatedOutput, 100))
-				}
-				if item.ExitCode != nil && *item.ExitCode != 0 {
-					result += fmt.Sprintf(" (exit %d)", *item.ExitCode)
-				}
-				return result
-			}
 		case "agent_message":
-			// don't truncate final response - it's important
+			// final response - don't truncate, no prefix
 			text := strings.ReplaceAll(item.Text, "\n", " ")
-			return fmt.Sprintf("Response: %s", strings.TrimSpace(text))
+			return strings.TrimSpace(text)
 		case "error":
 			return fmt.Sprintf("Error: %s", truncate(item.Message, 100))
-		}
-	case "turn.completed":
-		if event.Usage != nil {
-			return fmt.Sprintf("Tokens: %d input, %d output", event.Usage.InputTokens, event.Usage.OutputTokens)
 		}
 	}
 	return ""
