@@ -11,30 +11,23 @@ echo "Installing Codex Launcher..."
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-# Download latest release binaries
-echo "Downloading binaries..."
-curl -sL "https://github.com/$REPO/releases/latest/download/codex-launcher-web" -o codex-launcher-web
-curl -sL "https://github.com/$REPO/releases/latest/download/codex-launcher-worker" -o codex-launcher-worker
-chmod +x codex-launcher-web codex-launcher-worker
+# Download latest release binary
+echo "Downloading binary..."
+curl -sL "https://github.com/$REPO/releases/latest/download/codex-launcher" -o codex-launcher
+chmod +x codex-launcher
 
-# Check if tmux is installed
-if ! command -v tmux &> /dev/null; then
-    echo "Error: tmux is required but not installed."
-    exit 1
-fi
+# Kill existing process if any
+pkill -f "codex-launcher" 2>/dev/null || true
+sleep 1
 
-# Kill existing sessions if any
-tmux kill-session -t codex-launcher 2>/dev/null || true
-
-# Start tmux session with server and worker
-tmux new-session -d -s codex-launcher -n server "./codex-launcher-web -addr :$PORT -db $INSTALL_DIR/db.sqlite3"
-tmux new-window -t codex-launcher -n worker "./codex-launcher-worker -db $INSTALL_DIR/db.sqlite3"
+# Start in background
+nohup ./codex-launcher -db "$INSTALL_DIR/db.sqlite3" > "$INSTALL_DIR/launcher.log" 2>&1 &
 
 echo ""
 echo "Codex Launcher is running!"
 echo ""
 echo "  URL: http://127.0.0.1:$PORT"
 echo ""
-echo "  tmux attach -t codex-launcher  # to view logs"
-echo "  tmux kill-session -t codex-launcher  # to stop"
+echo "  Logs: tail -f $INSTALL_DIR/launcher.log"
+echo "  Stop: pkill -f codex-launcher"
 echo ""

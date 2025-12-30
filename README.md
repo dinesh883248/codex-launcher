@@ -13,26 +13,28 @@ This installs to `~/.codex-launcher` and starts the server on http://127.0.0.1:5
 ## Requirements
 
 - Go 1.21+ (for building from source)
-- SQLite
 - DejaVu fonts (for terminal image generation)
-- tmux (for install script)
 
 ## Build from Source
 
 ```bash
-go build -o codex-launcher-web ./cmd/web
-go build -o codex-launcher-worker ./cmd/worker
+go build -o codex-launcher ./cmd/launcher
 ```
 
-## Run Manually
+## Run
 
 ```bash
-# Start web server
-./codex-launcher-web -addr :55136 -db db.sqlite3
-
-# Start worker (in separate terminal)
-./codex-launcher-worker -db db.sqlite3
+./codex-launcher -db db.sqlite3
 ```
+
+### Options
+
+- `-addr` - Listen address (default: `:55136`)
+- `-db` - SQLite database path (default: `db.sqlite3`)
+- `-codex` - Codex binary path (default: `codex`)
+- `-model` - Codex model (default: `gpt-5.2-codex`)
+- `-reasoning` - Reasoning effort (default: `high`)
+- `-workdir` - Working directory for codex
 
 ## Features
 
