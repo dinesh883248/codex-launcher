@@ -1,43 +1,38 @@
-# Almono
+# Codex Launcher
 
 A web interface for running codex requests and viewing responses.
 
-## Requirements
-
-- Go 1.21+
-- SQLite
-- DejaVu fonts (for terminal image generation)
-
-## Build
+## Quick Install
 
 ```bash
-# Build web server
-go build -o almono-web ./cmd/web
-
-# Build worker
-go build -o almono-worker ./cmd/worker
+curl -sL https://github.com/dinesh883248/codex-launcher/releases/latest/download/install.sh | bash
 ```
 
-## Run
+This installs to `~/.codex-launcher` and starts the server on http://127.0.0.1:55136
+
+## Requirements
+
+- Go 1.21+ (for building from source)
+- SQLite
+- DejaVu fonts (for terminal image generation)
+- tmux (for install script)
+
+## Build from Source
+
+```bash
+go build -o codex-launcher-web ./cmd/web
+go build -o codex-launcher-worker ./cmd/worker
+```
+
+## Run Manually
 
 ```bash
 # Start web server
-./almono-web -addr :8080 -db db.sqlite3
+./codex-launcher-web -addr :55136 -db db.sqlite3
 
 # Start worker (in separate terminal)
-./almono-worker -db db.sqlite3
+./codex-launcher-worker -db db.sqlite3
 ```
-
-## Configuration
-
-### Web Server Options
-
-- `-addr` - Listen address (default: `:8080`)
-- `-db` - SQLite database path (default: `db.sqlite3`)
-
-### Worker Options
-
-- `-db` - SQLite database path (default: `db.sqlite3`)
 
 ## Features
 
