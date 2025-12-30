@@ -1,0 +1,224 @@
+{{ define "request_list" }}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Requests</title>
+<style>
+{{ .CSS }}
+</style>
+</head>
+<body>
+<table id="menu" style="width: 380px;">
+<colgroup>
+<col style="width: 80px;"/>
+<col style="width: 10px;"/>
+<col style="width: 180px;"/>
+<col style="width: 10px;"/>
+<col style="width: 100px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><a href="/">Home</a></td>
+<td>&nbsp;</td>
+<td><a href="/requests/">Requests</a></td>
+<td>&nbsp;</td>
+<td><a class="link-button" href="/livestream/">Livestream</a></td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td>&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 230px;"/>
+<col style="width: 30px;"/>
+<col style="width: 120px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><h1>Requests</h1></td>
+<td>&nbsp;</td>
+<td><a class="link-button" href="/requests/new">Create</a></td>
+</tr>
+</tbody>
+</table>
+<table id="breadcrumbs" style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><small>|&#160;<a href="/">Home</a>&#160;|&#160;<a href="/requests/">Requests</a>&#160;|</small></td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+{{ if .Requests }}
+{{ range .Requests }}
+<tr>
+<td>{{ if .URL }}<a href="{{ .URL }}">{{ .Display }}</a>{{ else }}<p>{{ .Display }}</p>{{ end }}</td>
+</tr>
+{{ if .ShowSpacer }}<tr><td>&nbsp;</td></tr>{{ end }}
+{{ end }}
+{{ else }}
+<tr>
+<td>No requests yet</td>
+</tr>
+{{ end }}
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 72px;"/>
+<col style="width: 5px;"/>
+<col style="width: 72px;"/>
+<col style="width: 5px;"/>
+<col style="width: 72px;"/>
+<col style="width: 5px;"/>
+<col style="width: 72px;"/>
+<col style="width: 5px;"/>
+<col style="width: 72px;"/>
+</colgroup>
+<tbody>
+<tr>
+{{ range .PageNumbers }}
+<td>
+{{ if gt .Value $.Pages }}
+<a class="link-button" href="#">-</a>
+{{ else }}
+<a class="link-button" href="?page={{ .Value }}">{{ if eq .Value $.Page }}[{{ .Value }}]{{ else }}{{ .Value }}{{ end }}</a>
+{{ end }}
+</td>
+{{ if .HasSpacer }}<td>&nbsp;</td>{{ end }}
+{{ end }}
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 185px;"/>
+<col style="width: 10px;"/>
+<col style="width: 185px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><a class="link-button" href="{{ if le .Page 1 }}#{{ else }}?page=1{{ end }}">Newest</a></td>
+<td>&nbsp;</td>
+<td><a class="link-button" href="{{ if ge .Page .Pages }}#{{ else }}?page={{ .Pages }}{{ end }}">Oldest</a></td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 190px;"/>
+<col style="width: 20px;"/>
+<col style="width: 170px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td>
+<form method="get">
+<table style="width: 190px;">
+<colgroup><col style="width: 190px;"/></colgroup>
+<tbody>
+<tr>
+<td><input name="page" type="text" placeholder="Enter page number"/></td>
+</tr>
+</tbody>
+</table>
+</form>
+</td>
+<td>&nbsp;</td>
+<td>
+<form method="get">
+<table style="width: 170px;">
+<colgroup><col style="width: 170px;"/></colgroup>
+<tbody>
+<tr>
+<td><button type="submit">Jump</button></td>
+</tr>
+</tbody>
+</table>
+</form>
+</td>
+</tr>
+<tr>
+<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><a class="link-button" href="/">Back to home</a></td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+</body>
+</html>
+{{ end }}

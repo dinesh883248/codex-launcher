@@ -1,0 +1,42 @@
+{{ define "livestream" }}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Livestream</title>
+<style>
+{{ .CSS }}
+</style>
+<link rel="stylesheet" href="/static/asciinema-player.css"/>
+<script src="/static/asciinema-player.min.js"></script>
+<script>
+if (!customElements.get("asciinema-player")) {
+  customElements.define("asciinema-player", class extends HTMLElement {
+    connectedCallback() {
+      if (this._started || !window.AsciinemaPlayer) {
+        return;
+      }
+      this._started = true;
+      AsciinemaPlayer.create(this.getAttribute("src"), this, {
+        autoplay: this.hasAttribute("autoplay")
+      });
+    }
+  });
+}
+</script>
+</head>
+<body>
+<table id="player" style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><asciinema-player src="{{ .CastURL }}" autoplay></asciinema-player></td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
+{{ end }}
