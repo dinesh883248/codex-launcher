@@ -28,3 +28,6 @@ __pycache__/
 /almono.db
 /db.sqlite3
 .env
+web-server
+worker
+node_modules/

@@ -3,6 +3,8 @@ package core
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -11,6 +13,29 @@ import (
 
 	"almono/api"
 )
+
+// codex JSON event types
+type codexEvent struct {
+	Type   string          `json:"type"`
+	Item   json.RawMessage `json:"item,omitempty"`
+	Usage  *usageInfo      `json:"usage,omitempty"`
+}
+
+type itemInfo struct {
+	Type             string `json:"type"`
+	Text             string `json:"text,omitempty"`
+	Message          string `json:"message,omitempty"`
+	Command          string `json:"command,omitempty"`
+	AggregatedOutput string `json:"aggregated_output,omitempty"`
+	ExitCode         *int   `json:"exit_code,omitempty"`
+	Status           string `json:"status,omitempty"`
+}
+
+type usageInfo struct {
+	InputTokens       int `json:"input_tokens"`
+	CachedInputTokens int `json:"cached_input_tokens"`
+	OutputTokens      int `json:"output_tokens"`
+}
 
 type Config struct {
 	PollInterval time.Duration
@@ -79,6 +104,7 @@ func StartWorker(ctx context.Context, store *api.Store, cfg Config) {
 func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64, prompt string) error {
 	args := []string{
 		"exec",
+		"--json",
 		"-m",
 		cfg.CodexModel,
 		"--config",
@@ -93,34 +119,37 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 		cmd.Dir = cfg.WorkDir
 	}
 
-	// capture stdout and stderr combined
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	cmd.Stderr = cmd.Stdout // combine stderr with stdout
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
-	// read output line by line and store in DB
+	// parse JSON events and store relevant output
 	lineNum := 1
 	reader := bufio.NewReader(stdout)
 	for {
 		line, err := reader.ReadString('\n')
 		if len(line) > 0 {
-			// also print to stdout for visibility
-			os.Stdout.WriteString(line)
-			// store in DB (strip trailing newline)
-			content := line
-			if len(content) > 0 && content[len(content)-1] == '\n' {
-				content = content[:len(content)-1]
+			// parse JSON event
+			var event codexEvent
+			if jsonErr := json.Unmarshal([]byte(line), &event); jsonErr != nil {
+				continue
 			}
-			if storeErr := store.AddOutputLine(ctx, requestID, lineNum, content); storeErr != nil {
-				log.Printf("failed to store output line: %v", storeErr)
+
+			// process relevant events
+			content := processEvent(event)
+			if content != "" {
+				log.Printf("[%d] %s", requestID, content)
+				if storeErr := store.AddOutputLine(ctx, requestID, lineNum, content); storeErr != nil {
+					log.Printf("failed to store output line: %v", storeErr)
+				}
+				lineNum++
 			}
-			lineNum++
 		}
 		if err == io.EOF {
 			break
@@ -131,6 +160,41 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 	}
 
 	return cmd.Wait()
+}
+
+// processEvent extracts display content from codex JSON events
+func processEvent(event codexEvent) string {
+	switch event.Type {
+	case "item.completed":
+		var item itemInfo
+		if err := json.Unmarshal(event.Item, &item); err != nil {
+			return ""
+		}
+		switch item.Type {
+		case "reasoning":
+			return fmt.Sprintf("Thinking: %s", item.Text)
+		case "command_execution":
+			if item.Status == "completed" {
+				result := fmt.Sprintf("$ %s", item.Command)
+				if item.AggregatedOutput != "" {
+					result += fmt.Sprintf(" -> %s", item.AggregatedOutput)
+				}
+				if item.ExitCode != nil && *item.ExitCode != 0 {
+					result += fmt.Sprintf(" (exit %d)", *item.ExitCode)
+				}
+				return result
+			}
+		case "agent_message":
+			return fmt.Sprintf("Response: %s", item.Text)
+		case "error":
+			return fmt.Sprintf("Error: %s", item.Message)
+		}
+	case "turn.completed":
+		if event.Usage != nil {
+			return fmt.Sprintf("Tokens: %d input, %d output", event.Usage.InputTokens, event.Usage.OutputTokens)
+		}
+	}
+	return ""
 }
 
 func responseFor(err error) string {
