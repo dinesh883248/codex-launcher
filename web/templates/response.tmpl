@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="refresh" content="3"/>
+{{ if ne .Status "processed" }}<meta http-equiv="refresh" content="3"/>{{ end }}
 <title>Response</title>
 <style>
 {{ .CSS }}
@@ -84,9 +84,24 @@
 <col style="width: 380px;"/>
 </colgroup>
 <tbody>
+{{ if eq .Status "processed" }}
 <tr>
 <td><img src="/requests/{{ .RequestID }}/image"/></td>
 </tr>
+{{ else }}
+{{ if .Lines }}
+{{ range .Lines }}
+<tr>
+<td><p>{{ .Content }}</p></td>
+</tr>
+{{ if .ShowSpacer }}<tr><td>&nbsp;</td></tr>{{ end }}
+{{ end }}
+{{ else }}
+<tr>
+<td><p>Processing...</p></td>
+</tr>
+{{ end }}
+{{ end }}
 </tbody>
 </table>
 <table style="width: 380px;">

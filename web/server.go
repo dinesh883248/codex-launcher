@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"embed"
 	"html/template"
 	"image/png"
@@ -11,6 +12,9 @@ import (
 	"almono/api"
 
 	"github.com/fogleman/gg"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 //go:embed templates/*.tmpl templates/immutable.css
@@ -50,14 +54,15 @@ type OutputRow struct {
 }
 
 type ResponseView struct {
-	CSS         template.CSS
-	RequestID   int64
-	Prompt      string
-	Status      string
-	Lines       []OutputRow
-	PageNumbers []PageNumber
-	Page        int
-	Pages       int
+	CSS          template.CSS
+	RequestID    int64
+	Prompt       string
+	Status       string
+	Lines        []OutputRow
+	FinalMessage string
+	PageNumbers  []PageNumber
+	Page         int
+	Pages        int
 }
 
 func NewServer(svc *api.Service) (*Server, error) {
@@ -175,46 +180,36 @@ func (s *Server) HandleResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := parseInt(r.URL.Query().Get("page"), 1)
-	linesPerPage := 50
-	offset := (page - 1) * linesPerPage
-
-	lines, total, err := s.svc.GetOutputLines(r.Context(), id, linesPerPage, offset)
+	lines, _, err := s.svc.GetOutputLines(r.Context(), id, 1000, 0)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	pages := (total + linesPerPage - 1) / linesPerPage
-	if pages < 1 {
-		pages = 1
+	// get latest status and final message
+	// status lines start with "Thinking:", final message has no prefix
+	var latestStatus string
+	var finalMessage string
+	for i := 0; i < len(lines); i++ {
+		content := lines[i].Content
+		if strings.HasPrefix(content, "Thinking:") {
+			latestStatus = content
+		} else {
+			finalMessage = content
+		}
 	}
-
-	// reverse lines to show oldest first (chronological order)
-	outputRows := make([]OutputRow, 0, len(lines))
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
-		outputRows = append(outputRows, OutputRow{
-			LineNum:    line.LineNum,
-			Content:    line.Content,
-			ShowSpacer: i > 0,
-		})
-	}
-
-	pageNumbers := make([]PageNumber, 0, 5)
-	for i := 1; i <= 5; i++ {
-		pageNumbers = append(pageNumbers, PageNumber{Value: i, HasSpacer: i < 5})
+	var statusRows []OutputRow
+	if latestStatus != "" {
+		statusRows = append(statusRows, OutputRow{Content: latestStatus})
 	}
 
 	data := ResponseView{
-		CSS:         s.css,
-		RequestID:   req.ID,
-		Prompt:      req.Prompt,
-		Status:      req.Status,
-		Lines:       outputRows,
-		PageNumbers: pageNumbers,
-		Page:        page,
-		Pages:       pages,
+		CSS:          s.css,
+		RequestID:    req.ID,
+		Prompt:       req.Prompt,
+		Status:       req.Status,
+		Lines:        statusRows,
+		FinalMessage: finalMessage,
 	}
 	if err := s.templates.ExecuteTemplate(w, "response", data); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -237,13 +232,15 @@ func parseInt(val string, fallback int) int {
 // ----------------------------------
 
 const (
-	termFontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-	termFontSize = 14.0
-	termPadding  = 20.0
-	termBgColor  = "#1e1e1e"
-	termFgColor  = "#d4d4d4"
-	termWidth    = 380
-	termLineH    = 20.0
+	termFontPath  = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+	termFontBold  = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+	termFontSize  = 14.0
+	termPadding   = 20.0
+	termBgColor   = "#1e1e1e"
+	termFgColor   = "#d4d4d4"
+	termCodeColor = "#ce9178"
+	termWidth     = 550
+	termLineH     = 20.0
 )
 
 func (s *Server) HandleImage(w http.ResponseWriter, r *http.Request) {
@@ -279,14 +276,18 @@ func (s *Server) HandleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// reverse to chronological order
-	content := make([]string, 0, len(lines))
+	// find final message (non-status lines)
+	var finalMessage string
 	for i := len(lines) - 1; i >= 0; i-- {
-		content = append(content, lines[i].Content)
+		content := lines[i].Content
+		if !strings.HasPrefix(content, "Thinking:") {
+			finalMessage = content
+			break
+		}
 	}
 
-	// generate terminal image
-	img, err := renderTerminalImage(content)
+	// generate terminal image for final message only
+	img, err := renderTerminalImage([]string{finalMessage})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -296,9 +297,24 @@ func (s *Server) HandleImage(w http.ResponseWriter, r *http.Request) {
 	png.Encode(w, img.Image())
 }
 
+// ----------------------------------
+// Styled text segment for markdown
+// ----------------------------------
+
+type styledSegment struct {
+	text string
+	bold bool
+	code bool
+}
+
 func renderTerminalImage(lines []string) (*gg.Context, error) {
-	// wrap long lines
-	wrapped := wrapLines(lines, 50)
+	content := strings.Join(lines, "\n")
+
+	// parse markdown and extract styled segments
+	segments := parseMarkdown(content)
+
+	// wrap into lines with style info
+	wrapped := wrapStyledLines(segments, 60)
 
 	// calculate image height
 	height := termPadding*2 + float64(len(wrapped))*termLineH
@@ -312,37 +328,140 @@ func renderTerminalImage(lines []string) (*gg.Context, error) {
 	dc.SetHexColor(termBgColor)
 	dc.Clear()
 
-	// load font
-	if err := dc.LoadFontFace(termFontPath, termFontSize); err != nil {
-		return nil, err
-	}
-
-	// draw text
-	dc.SetHexColor(termFgColor)
+	// draw styled text
 	y := termPadding + termFontSize
 	for _, line := range wrapped {
-		dc.DrawString(line, termPadding, y)
+		x := termPadding
+		for _, seg := range line {
+			// load appropriate font
+			fontPath := termFontPath
+			if seg.bold {
+				fontPath = termFontBold
+			}
+			dc.LoadFontFace(fontPath, termFontSize)
+
+			// set color
+			if seg.code {
+				dc.SetHexColor(termCodeColor)
+			} else {
+				dc.SetHexColor(termFgColor)
+			}
+
+			dc.DrawString(seg.text, x, y)
+			w, _ := dc.MeasureString(seg.text)
+			x += w
+		}
 		y += termLineH
 	}
 
 	return dc, nil
 }
 
-func wrapLines(lines []string, maxChars int) []string {
-	var result []string
-	for _, line := range lines {
-		if len(line) <= maxChars {
-			result = append(result, line)
-			continue
+func parseMarkdown(content string) []styledSegment {
+	var segments []styledSegment
+	source := []byte(content)
+	md := goldmark.New()
+	reader := text.NewReader(source)
+	doc := md.Parser().Parse(reader)
+
+	// walk AST and extract styled segments
+	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
 		}
-		// wrap long lines
-		for len(line) > maxChars {
-			result = append(result, line[:maxChars])
-			line = line[maxChars:]
+
+		switch node := n.(type) {
+		case *ast.Text:
+			txt := string(node.Segment.Value(source))
+			bold := isInStrong(n)
+			code := isInCode(n)
+			if txt != "" {
+				segments = append(segments, styledSegment{text: txt, bold: bold, code: code})
+			}
+			if node.SoftLineBreak() || node.HardLineBreak() {
+				segments = append(segments, styledSegment{text: "\n"})
+			}
+		case *ast.CodeSpan:
+			var buf bytes.Buffer
+			for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+				if t, ok := c.(*ast.Text); ok {
+					buf.Write(t.Segment.Value(source))
+				}
+			}
+			segments = append(segments, styledSegment{text: buf.String(), code: true})
+			return ast.WalkSkipChildren, nil
+		case *ast.Paragraph:
+			if n.PreviousSibling() != nil {
+				segments = append(segments, styledSegment{text: "\n"})
+			}
 		}
-		if len(line) > 0 {
-			result = append(result, line)
+		return ast.WalkContinue, nil
+	})
+
+	return segments
+}
+
+func isInStrong(n ast.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if _, ok := p.(*ast.Emphasis); ok {
+			if p.(*ast.Emphasis).Level == 2 {
+				return true
+			}
 		}
 	}
+	return false
+}
+
+func isInCode(n ast.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if _, ok := p.(*ast.CodeSpan); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func wrapStyledLines(segments []styledSegment, maxChars int) [][]styledSegment {
+	var result [][]styledSegment
+	var currentLine []styledSegment
+	lineLen := 0
+
+	for _, seg := range segments {
+		if seg.text == "\n" {
+			result = append(result, currentLine)
+			currentLine = nil
+			lineLen = 0
+			continue
+		}
+
+		words := strings.Fields(seg.text)
+		for i, word := range words {
+			wordLen := len(word)
+			needSpace := i > 0 || (lineLen > 0 && len(currentLine) > 0)
+			spaceLen := 0
+			if needSpace {
+				spaceLen = 1
+			}
+
+			if lineLen+spaceLen+wordLen > maxChars && lineLen > 0 {
+				result = append(result, currentLine)
+				currentLine = nil
+				lineLen = 0
+				needSpace = false
+			}
+
+			if needSpace {
+				currentLine = append(currentLine, styledSegment{text: " ", bold: seg.bold, code: seg.code})
+				lineLen++
+			}
+			currentLine = append(currentLine, styledSegment{text: word, bold: seg.bold, code: seg.code})
+			lineLen += wordLen
+		}
+	}
+
+	if len(currentLine) > 0 {
+		result = append(result, currentLine)
+	}
+
 	return result
 }

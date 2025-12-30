@@ -116,6 +116,7 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 	}
 	cmd := exec.CommandContext(ctx, cfg.CodexBin, args...)
 	cmd.Stdin = os.Stdin
+	cmd.Env = append(os.Environ(), "COLUMNS=60")
 	if cfg.WorkDir != "" {
 		cmd.Dir = cfg.WorkDir
 	}
