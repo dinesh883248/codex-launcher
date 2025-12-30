@@ -3,11 +3,14 @@ package web
 import (
 	"embed"
 	"html/template"
+	"image/png"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"almono/api"
+
+	"github.com/fogleman/gg"
 )
 
 //go:embed templates/*.tmpl templates/immutable.css
@@ -80,6 +83,11 @@ func (s *Server) HandleRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/requests/") {
+		// check if it's an image request
+		if strings.HasSuffix(r.URL.Path, "/image") || strings.HasSuffix(r.URL.Path, "/image/") {
+			s.HandleImage(w, r)
+			return
+		}
 		s.HandleResponse(w, r)
 		return
 	}
@@ -222,4 +230,119 @@ func parseInt(val string, fallback int) int {
 		return fallback
 	}
 	return num
+}
+
+// ----------------------------------
+// Terminal-style image generation
+// ----------------------------------
+
+const (
+	termFontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+	termFontSize = 14.0
+	termPadding  = 20.0
+	termBgColor  = "#1e1e1e"
+	termFgColor  = "#d4d4d4"
+	termWidth    = 380
+	termLineH    = 20.0
+)
+
+func (s *Server) HandleImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// extract ID from /requests/{id}/image
+	path := strings.TrimPrefix(r.URL.Path, "/requests/")
+	path = strings.TrimSuffix(path, "/image/")
+	path = strings.TrimSuffix(path, "/image")
+	id, err := strconv.ParseInt(path, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, ok, err := s.svc.GetRequest(r.Context(), id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// get all output lines
+	lines, _, err := s.svc.GetOutputLines(r.Context(), id, 1000, 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// reverse to chronological order
+	content := make([]string, 0, len(lines))
+	for i := len(lines) - 1; i >= 0; i-- {
+		content = append(content, lines[i].Content)
+	}
+
+	// generate terminal image
+	img, err := renderTerminalImage(content)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	png.Encode(w, img.Image())
+}
+
+func renderTerminalImage(lines []string) (*gg.Context, error) {
+	// wrap long lines
+	wrapped := wrapLines(lines, 50)
+
+	// calculate image height
+	height := termPadding*2 + float64(len(wrapped))*termLineH
+	if height < 100 {
+		height = 100
+	}
+
+	dc := gg.NewContext(termWidth, int(height))
+
+	// draw background
+	dc.SetHexColor(termBgColor)
+	dc.Clear()
+
+	// load font
+	if err := dc.LoadFontFace(termFontPath, termFontSize); err != nil {
+		return nil, err
+	}
+
+	// draw text
+	dc.SetHexColor(termFgColor)
+	y := termPadding + termFontSize
+	for _, line := range wrapped {
+		dc.DrawString(line, termPadding, y)
+		y += termLineH
+	}
+
+	return dc, nil
+}
+
+func wrapLines(lines []string, maxChars int) []string {
+	var result []string
+	for _, line := range lines {
+		if len(line) <= maxChars {
+			result = append(result, line)
+			continue
+		}
+		// wrap long lines
+		for len(line) > maxChars {
+			result = append(result, line[:maxChars])
+			line = line[maxChars:]
+		}
+		if len(line) > 0 {
+			result = append(result, line)
+		}
+	}
+	return result
 }

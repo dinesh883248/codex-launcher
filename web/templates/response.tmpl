@@ -84,52 +84,8 @@
 <col style="width: 380px;"/>
 </colgroup>
 <tbody>
-{{ if .Lines }}
-{{ range .Lines }}
 <tr>
-<td><p>{{ .Content }}</p></td>
-</tr>
-{{ if .ShowSpacer }}<tr><td>&nbsp;</td></tr>{{ end }}
-{{ end }}
-{{ else }}
-<tr>
-<td><p>No output yet</p></td>
-</tr>
-{{ end }}
-</tbody>
-</table>
-<table style="width: 380px;">
-<colgroup>
-<col style="width: 380px;"/>
-</colgroup>
-<tbody>
-<tr><td>&nbsp;</td></tr>
-</tbody>
-</table>
-<table style="width: 380px;">
-<colgroup>
-<col style="width: 72px;"/>
-<col style="width: 5px;"/>
-<col style="width: 72px;"/>
-<col style="width: 5px;"/>
-<col style="width: 72px;"/>
-<col style="width: 5px;"/>
-<col style="width: 72px;"/>
-<col style="width: 5px;"/>
-<col style="width: 72px;"/>
-</colgroup>
-<tbody>
-<tr>
-{{ range .PageNumbers }}
-<td>
-{{ if gt .Value $.Pages }}
-<a class="link-button" href="#">-</a>
-{{ else }}
-<a class="link-button" href="?page={{ .Value }}">{{ if eq .Value $.Page }}[{{ .Value }}]{{ else }}{{ .Value }}{{ end }}</a>
-{{ end }}
-</td>
-{{ if .HasSpacer }}<td>&nbsp;</td>{{ end }}
-{{ end }}
+<td><img src="/requests/{{ .RequestID }}/image"/></td>
 </tr>
 </tbody>
 </table>
