@@ -58,3 +58,7 @@ func (s *Service) GetProcessingRequest(ctx context.Context) (Request, bool, erro
 func (s *Service) GetRequest(ctx context.Context, id int64) (Request, bool, error) {
 	return s.store.GetRequest(ctx, id)
 }
+
+func (s *Service) GetOutputLines(ctx context.Context, requestID int64, limit, offset int) ([]OutputLine, int, error) {
+	return s.store.GetOutputLines(ctx, requestID, limit, offset)
+}

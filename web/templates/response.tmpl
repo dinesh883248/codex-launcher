@@ -1,10 +1,11 @@
-{{ define "request_list" }}
+{{ define "response" }}
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Requests</title>
+<meta http-equiv="refresh" content="3"/>
+<title>Response</title>
 <style>
 {{ .CSS }}
 </style>
@@ -16,7 +17,7 @@
 </colgroup>
 <tbody>
 <tr>
-<td><h1>Requests</h1></td>
+<td><h1>Response</h1></td>
 </tr>
 </tbody>
 </table>
@@ -34,18 +35,7 @@
 </colgroup>
 <tbody>
 <tr>
-<td>
-<form method="post" action="/requests/new">
-<table style="width: 380px;">
-<colgroup><col style="width: 380px;"/></colgroup>
-<tbody>
-<tr><td><input type="text" name="request" placeholder="Request"/></td></tr>
-<tr><td>&nbsp;</td></tr>
-<tr><td><button type="submit">Send request</button></td></tr>
-</tbody>
-</table>
-</form>
-</td>
+<td><p>{{ .Prompt }}</p></td>
 </tr>
 </tbody>
 </table>
@@ -62,16 +52,34 @@
 <col style="width: 380px;"/>
 </colgroup>
 <tbody>
-{{ if .Requests }}
-{{ range .Requests }}
 <tr>
-<td>{{ if .URL }}<a href="{{ .URL }}">{{ .Display }}</a>{{ else }}<p>{{ .Display }}</p>{{ end }}</td>
+<td><p>{{ .Status }}</p></td>
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+{{ if .Lines }}
+{{ range .Lines }}
+<tr>
+<td><p>{{ .Content }}</p></td>
 </tr>
 {{ if .ShowSpacer }}<tr><td>&nbsp;</td></tr>{{ end }}
 {{ end }}
 {{ else }}
 <tr>
-<td><p>No requests yet</p></td>
+<td><p>No output yet</p></td>
 </tr>
 {{ end }}
 </tbody>
@@ -108,6 +116,24 @@
 </td>
 {{ if .HasSpacer }}<td>&nbsp;</td>{{ end }}
 {{ end }}
+</tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<table style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td><a class="link-button" href="/requests/">Back to requests</a></td>
 </tr>
 </tbody>
 </table>

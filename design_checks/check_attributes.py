@@ -1,10 +1,8 @@
 """
 MUST HAVE REQUIREMENTS:
 - Allow only the explicit attribute set per tag defined in allowed_attrs.
-- Permit an id attribute solely on table elements, with td ids allowed for request_cast.html.
+- Permit an id attribute solely on table elements.
 - When an anchor has a class, it must be exactly link-button.
-- Allow link/script/asciinema-player only when the filename is livestream.html or request_cast.html.
-- Allow link type=... only for request_cast.html.
 - Read HTML directly from a path or stdin without pickle staging.
 """
 # ----------------------------------
@@ -24,18 +22,7 @@ allowed_attrs = {
     "textarea": {"name", "hidden", "rows", "disabled"},
     "a": {"href", "class"},
     "img": {"src"},
-    "link": {"rel", "href"},
-    "script": {"src"},
-    "asciinema-player": {"src", "autoplay"},
 }
-extra = {"link", "script", "asciinema-player"}
-
-target = sys.argv[1] if len(sys.argv) > 1 else ""
-allow_request_cast = target.endswith("request_cast.html")
-allow_extra = target.endswith("livestream.html") or allow_request_cast
-if allow_request_cast:
-    allowed_attrs["td"] = {"id"}
-    allowed_attrs["link"] = {"rel", "href", "type"}
 
 
 class P(HTMLParser):
@@ -45,9 +32,6 @@ class P(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         if self.bad:
-            return
-        if tag in extra and not allow_extra:
-            self.bad = f"disallowed tag {tag}"
             return
         names = allowed_attrs[tag] if tag in allowed_attrs else ()
         for name, _ in attrs:

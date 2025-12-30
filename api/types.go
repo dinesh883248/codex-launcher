@@ -6,7 +6,12 @@ type Request struct {
 	Status    string
 	Response  string
 	CreatedAt string
-	CastStart *float64
-	CastEnd   *float64
-	CastPath  string
+}
+
+type OutputLine struct {
+	ID        int64
+	RequestID int64
+	LineNum   int
+	Content   string
+	CreatedAt string
 }

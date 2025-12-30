@@ -1,7 +1,9 @@
 package core
 
 import (
+	"bufio"
 	"context"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -16,8 +18,6 @@ type Config struct {
 	CodexModel   string
 	Reasoning    string
 	WorkDir      string
-	LiveCastPath string
-	RequestDir   string
 }
 
 func StartWorker(ctx context.Context, store *api.Store, cfg Config) {
@@ -65,41 +65,18 @@ func StartWorker(ctx context.Context, store *api.Store, cfg Config) {
 		}
 
 		log.Printf("processing request %d", req.ID)
-		castStart, startOK := captureCastTime(cfg.LiveCastPath)
-		if startOK {
-			if err := store.UpdateRequestCastStart(ctx, req.ID, castStart); err != nil {
-				log.Printf("worker cast start update failed: %v", err)
-			}
-		}
 		status := "processed"
-		err = runCodex(ctx, cfg, req.Prompt)
+		err = runCodex(ctx, store, cfg, req.ID, req.Prompt)
 		if err != nil {
 			status = "error"
 		}
-		castEnd, endOK := captureCastTime(cfg.LiveCastPath)
-		castPath := ""
-		if startOK && endOK && cfg.RequestDir != "" && cfg.LiveCastPath != "" {
-			if castEnd < castStart {
-				castEnd = castStart
-			}
-			outPath := requestCastPath(cfg.RequestDir, req.ID)
-			if err := writeRequestCast(cfg.LiveCastPath, outPath, castStart, castEnd); err != nil {
-				log.Printf("worker cast write failed: %v", err)
-			} else {
-				castPath = requestCastRel(req.ID)
-			}
-		}
-		var endPtr *float64
-		if endOK {
-			endPtr = &castEnd
-		}
-		if err := store.UpdateRequestFinal(ctx, req.ID, status, responseFor(err), endPtr, castPath); err != nil {
+		if err := store.UpdateRequest(ctx, req.ID, status, responseFor(err)); err != nil {
 			log.Printf("worker update failed: %v", err)
 		}
 	}
 }
 
-func runCodex(ctx context.Context, cfg Config, prompt string) error {
+func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64, prompt string) error {
 	args := []string{
 		"exec",
 		"-m",
@@ -112,12 +89,48 @@ func runCodex(ctx context.Context, cfg Config, prompt string) error {
 	}
 	cmd := exec.CommandContext(ctx, cfg.CodexBin, args...)
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	if cfg.WorkDir != "" {
 		cmd.Dir = cfg.WorkDir
 	}
-	return cmd.Run()
+
+	// capture stdout and stderr combined
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = cmd.Stdout // combine stderr with stdout
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// read output line by line and store in DB
+	lineNum := 1
+	reader := bufio.NewReader(stdout)
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			// also print to stdout for visibility
+			os.Stdout.WriteString(line)
+			// store in DB (strip trailing newline)
+			content := line
+			if len(content) > 0 && content[len(content)-1] == '\n' {
+				content = content[:len(content)-1]
+			}
+			if storeErr := store.AddOutputLine(ctx, requestID, lineNum, content); storeErr != nil {
+				log.Printf("failed to store output line: %v", storeErr)
+			}
+			lineNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	return cmd.Wait()
 }
 
 func responseFor(err error) string {
