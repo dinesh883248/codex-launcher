@@ -5,6 +5,7 @@ import (
 	"embed"
 	"html/template"
 	"image/png"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -148,6 +149,7 @@ func (s *Server) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	prompt := r.FormValue("request")
 	_, err := s.svc.CreateRequest(r.Context(), prompt)
 	if err != nil {
+		log.Printf("CreateRequest failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -186,16 +188,13 @@ func (s *Server) HandleResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get latest status and final message
-	// status lines start with "Thinking:", final message has no prefix
+	// get latest status (reasoning only) for display while processing
+	// lines are ordered DESC (newest first)
 	var latestStatus string
-	var finalMessage string
-	for i := 0; i < len(lines); i++ {
-		content := lines[i].Content
-		if strings.HasPrefix(content, "Thinking:") {
-			latestStatus = content
-		} else {
-			finalMessage = content
+	for _, line := range lines {
+		if line.LineType == "reasoning" {
+			latestStatus = line.Content
+			break
 		}
 	}
 	var statusRows []OutputRow
@@ -204,12 +203,11 @@ func (s *Server) HandleResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ResponseView{
-		CSS:          s.css,
-		RequestID:    req.ID,
-		Prompt:       req.Prompt,
-		Status:       req.Status,
-		Lines:        statusRows,
-		FinalMessage: finalMessage,
+		CSS:       s.css,
+		RequestID: req.ID,
+		Prompt:    req.Prompt,
+		Status:    req.Status,
+		Lines:     statusRows,
 	}
 	if err := s.templates.ExecuteTemplate(w, "response", data); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -276,18 +274,17 @@ func (s *Server) HandleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// find final message (non-status lines)
-	var finalMessage string
+	// collect all message and error lines for image
+	// lines are ordered DESC (newest first), so reverse to get chronological order
+	var messages []string
 	for i := len(lines) - 1; i >= 0; i-- {
-		content := lines[i].Content
-		if !strings.HasPrefix(content, "Thinking:") {
-			finalMessage = content
-			break
+		if lines[i].LineType == "message" || lines[i].LineType == "error" {
+			messages = append(messages, lines[i].Content)
 		}
 	}
 
-	// generate terminal image for final message only
-	img, err := renderTerminalImage([]string{finalMessage})
+	// generate terminal image with all messages aggregated
+	img, err := renderTerminalImage(messages)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -314,7 +311,7 @@ func renderTerminalImage(lines []string) (*gg.Context, error) {
 	segments := parseMarkdown(content)
 
 	// wrap into lines with style info
-	wrapped := wrapStyledLines(segments, 60)
+	wrapped := wrapStyledLines(segments, 50)
 
 	// calculate image height
 	height := termPadding*2 + float64(len(wrapped))*termLineH

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -116,7 +115,7 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 	}
 	cmd := exec.CommandContext(ctx, cfg.CodexBin, args...)
 	cmd.Stdin = os.Stdin
-	cmd.Env = append(os.Environ(), "COLUMNS=60")
+	cmd.Env = append(os.Environ(), "COLUMNS=50")
 	if cfg.WorkDir != "" {
 		cmd.Dir = cfg.WorkDir
 	}
@@ -144,10 +143,10 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 			}
 
 			// process relevant events
-			content := processEvent(event)
+			lineType, content := processEvent(event)
 			if content != "" {
-				log.Printf("[%d] %s", requestID, content)
-				if storeErr := store.AddOutputLine(ctx, requestID, lineNum, content); storeErr != nil {
+				log.Printf("[%d] [%s] %s", requestID, lineType, truncate(content, 80))
+				if storeErr := store.AddOutputLine(ctx, requestID, lineNum, lineType, content); storeErr != nil {
 					log.Printf("failed to store output line: %v", storeErr)
 				}
 				lineNum++
@@ -164,26 +163,28 @@ func runCodex(ctx context.Context, store *api.Store, cfg Config, requestID int64
 	return cmd.Wait()
 }
 
-// processEvent extracts display content from codex JSON events
-func processEvent(event codexEvent) string {
-	switch event.Type {
-	case "item.completed":
-		var item itemInfo
-		if err := json.Unmarshal(event.Item, &item); err != nil {
-			return ""
-		}
-		switch item.Type {
-		case "reasoning":
-			return fmt.Sprintf("Thinking: %s", truncate(item.Text, 100))
-		case "agent_message":
-			// final response - don't truncate, no prefix
-			text := strings.ReplaceAll(item.Text, "\n", " ")
-			return strings.TrimSpace(text)
-		case "error":
-			return fmt.Sprintf("Error: %s", truncate(item.Message, 100))
+// processEvent extracts line type and content from codex JSON events
+func processEvent(event codexEvent) (lineType, content string) {
+	if event.Type != "item.completed" {
+		return "", ""
+	}
+	var item itemInfo
+	if err := json.Unmarshal(event.Item, &item); err != nil {
+		return "", ""
+	}
+	switch item.Type {
+	case "reasoning":
+		return "reasoning", strings.TrimSpace(item.Text)
+	case "agent_message":
+		return "message", strings.TrimSpace(item.Text)
+	case "error":
+		return "error", strings.TrimSpace(item.Message)
+	case "command_execution":
+		if item.Status == "completed" {
+			return "command", strings.TrimSpace(item.AggregatedOutput)
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // truncate limits string length and adds ellipsis

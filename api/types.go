@@ -12,6 +12,7 @@ type OutputLine struct {
 	ID        int64
 	RequestID int64
 	LineNum   int
+	LineType  string
 	Content   string
 	CreatedAt string
 }

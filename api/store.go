@@ -37,6 +37,7 @@ func (s *Store) Init(ctx context.Context) error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			request_id INTEGER NOT NULL,
 			line_num INTEGER NOT NULL,
+			line_type TEXT NOT NULL DEFAULT 'message',
 			content TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (request_id) REFERENCES requests(id)
@@ -48,6 +49,9 @@ func (s *Store) Init(ctx context.Context) error {
 
 	// index for fast lookup by request_id
 	_, _ = s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_output_lines_request ON output_lines(request_id, line_num)`)
+
+	// migration: add line_type column if missing
+	_, _ = s.db.ExecContext(ctx, `ALTER TABLE output_lines ADD COLUMN line_type TEXT NOT NULL DEFAULT 'message'`)
 
 	return nil
 }
@@ -195,12 +199,12 @@ func (s *Store) GetRequest(ctx context.Context, id int64) (Request, bool, error)
 }
 
 // AddOutputLine inserts a single line of output for a request
-func (s *Store) AddOutputLine(ctx context.Context, requestID int64, lineNum int, content string) error {
+func (s *Store) AddOutputLine(ctx context.Context, requestID int64, lineNum int, lineType, content string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(
 		ctx,
-		"INSERT INTO output_lines (request_id, line_num, content, created_at) VALUES (?, ?, ?, ?)",
-		requestID, lineNum, content, now,
+		"INSERT INTO output_lines (request_id, line_num, line_type, content, created_at) VALUES (?, ?, ?, ?, ?)",
+		requestID, lineNum, lineType, content, now,
 	)
 	return err
 }
@@ -217,7 +221,7 @@ func (s *Store) GetOutputLines(ctx context.Context, requestID int64, limit, offs
 	// get lines ordered by line_num descending (newest first), with pagination
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, request_id, line_num, content, created_at
+		`SELECT id, request_id, line_num, line_type, content, created_at
 		FROM output_lines
 		WHERE request_id = ?
 		ORDER BY line_num DESC
@@ -232,7 +236,7 @@ func (s *Store) GetOutputLines(ctx context.Context, requestID int64, limit, offs
 	var lines []OutputLine
 	for rows.Next() {
 		var line OutputLine
-		if err := rows.Scan(&line.ID, &line.RequestID, &line.LineNum, &line.Content, &line.CreatedAt); err != nil {
+		if err := rows.Scan(&line.ID, &line.RequestID, &line.LineNum, &line.LineType, &line.Content, &line.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		lines = append(lines, line)
