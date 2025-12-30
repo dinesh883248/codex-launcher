@@ -12,20 +12,14 @@ import (
 	"time"
 
 	"almono/api"
-	"almono/core"
 	"almono/web"
 
 	_ "modernc.org/sqlite"
 )
 
 func main() {
-	addr := flag.String("addr", ":55136", "listen address")
+	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "db.sqlite3", "sqlite database path")
-	poll := flag.Duration("poll", 2*time.Second, "worker poll interval")
-	codexBin := flag.String("codex", "codex", "codex binary")
-	codexModel := flag.String("model", "gpt-5.2-codex", "codex model")
-	reasoning := flag.String("reasoning", "high", "codex reasoning effort")
-	workDir := flag.String("workdir", "", "codex workdir")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -42,17 +36,6 @@ func main() {
 		log.Fatalf("db init failed: %v", err)
 	}
 
-	// start worker in background
-	cfg := core.Config{
-		PollInterval: *poll,
-		CodexBin:     *codexBin,
-		CodexModel:   *codexModel,
-		Reasoning:    *reasoning,
-		WorkDir:      *workDir,
-	}
-	go core.StartWorker(ctx, store, cfg)
-
-	// start web server
 	svc := api.NewService(store)
 	webServer, err := web.NewServer(svc)
 	if err != nil {
@@ -79,7 +62,7 @@ func main() {
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("Codex Launcher running at http://127.0.0.1%s", *addr)
+	log.Printf("listening on %s", *addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server failed: %v", err)
 	}
