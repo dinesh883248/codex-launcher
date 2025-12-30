@@ -1,33 +1,19 @@
+# Binaries
 *.exe
-*.exe~
 *.dll
 *.so
 *.dylib
-*.test
-*.out
-/bin/
-/build/
-/dist/
-/server
-/almono
-/almono-*
+almono-web
+almono-worker
 
+# Database
+*.db
+*.sqlite3
+
+# IDE
 .DS_Store
 .idea/
 .vscode/
 
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.egg-info/
-.uv/
-
-/casts/
-/almono.db
-/db.sqlite3
+# Environment
 .env
-web-server
-worker
-node_modules/
