@@ -42,10 +42,19 @@ func (s *Service) ListRequests(ctx context.Context, page, pageSize int) (Page, e
 	}
 	if page > pages {
 		page = pages
+		offset = (page - 1) * pageSize
+		items, _, err = s.store.ListRequests(ctx, offset, pageSize)
+		if err != nil {
+			return Page{}, err
+		}
 	}
 	return Page{Requests: items, Page: page, Pages: pages, Total: total}, nil
 }
 
 func (s *Service) GetProcessingRequest(ctx context.Context) (Request, bool, error) {
 	return s.store.GetProcessingRequest(ctx)
+}
+
+func (s *Service) GetRequest(ctx context.Context, id int64) (Request, bool, error) {
+	return s.store.GetRequest(ctx, id)
 }

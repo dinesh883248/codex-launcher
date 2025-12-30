@@ -32,6 +32,8 @@ func main() {
 	session := flag.String("session", "almono-worker", "tmux session name")
 	cols := flag.Int("cols", 80, "terminal columns for recording")
 	rows := flag.Int("rows", 72, "terminal rows for recording")
+	liveCast := flag.String("live-cast", "", "path to the live cast file")
+	requestCastDir := flag.String("request-cast-dir", "", "directory for request cast files")
 	child := flag.Bool("child", false, "run worker loop (internal)")
 	flag.Parse()
 
@@ -39,12 +41,23 @@ func main() {
 	defer stop()
 
 	if *child {
-		runWorker(ctx, *dbPath, core.Config{
+		coreCfg := core.Config{
 			PollInterval: *poll,
 			CodexBin:     *codexBin,
 			CodexModel:   *codexModel,
 			Reasoning:    *reasoning,
 			WorkDir:      *workDir,
+			LiveCastPath: *liveCast,
+			RequestDir:   *requestCastDir,
+		}
+		runWorker(ctx, *dbPath, core.Config{
+			PollInterval: coreCfg.PollInterval,
+			CodexBin:     coreCfg.CodexBin,
+			CodexModel:   coreCfg.CodexModel,
+			Reasoning:    coreCfg.Reasoning,
+			WorkDir:      coreCfg.WorkDir,
+			LiveCastPath: coreCfg.LiveCastPath,
+			RequestDir:   coreCfg.RequestDir,
 		})
 		return
 	}
@@ -53,6 +66,17 @@ func main() {
 	castDir := filepath.Join(baseDir, "casts")
 	if err := os.MkdirAll(castDir, 0o755); err != nil {
 		log.Fatalf("cast dir failed: %v", err)
+	}
+	liveCastPath := *liveCast
+	if liveCastPath == "" {
+		liveCastPath = filepath.Join(castDir, api.LiveCastName())
+	}
+	reqCastDir := *requestCastDir
+	if reqCastDir == "" {
+		reqCastDir = filepath.Join(castDir, "requests")
+	}
+	if err := os.MkdirAll(reqCastDir, 0o755); err != nil {
+		log.Fatalf("request cast dir failed: %v", err)
 	}
 	asciinemaPath := *asciinemaBin
 	if asciinemaPath == "" {
@@ -81,12 +105,16 @@ func main() {
 		shellQuote(*codexModel),
 		"--reasoning",
 		shellQuote(*reasoning),
+		"--live-cast",
+		shellQuote(liveCastPath),
+		"--request-cast-dir",
+		shellQuote(reqCastDir),
 	}
 	if *workDir != "" {
 		childArgs = append(childArgs, "--workdir", shellQuote(*workDir))
 	}
 	childCmd := strings.Join(childArgs, " ")
-	castPath := filepath.Join(castDir, api.LiveCastName())
+	castPath := liveCastPath
 	recordCmd := exec.Command(
 		*tmuxBin,
 		"new-session",

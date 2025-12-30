@@ -16,6 +16,8 @@ type Config struct {
 	CodexModel   string
 	Reasoning    string
 	WorkDir      string
+	LiveCastPath string
+	RequestDir   string
 }
 
 func StartWorker(ctx context.Context, store *api.Store, cfg Config) {
@@ -63,12 +65,35 @@ func StartWorker(ctx context.Context, store *api.Store, cfg Config) {
 		}
 
 		log.Printf("processing request %d", req.ID)
+		castStart, startOK := captureCastTime(cfg.LiveCastPath)
+		if startOK {
+			if err := store.UpdateRequestCastStart(ctx, req.ID, castStart); err != nil {
+				log.Printf("worker cast start update failed: %v", err)
+			}
+		}
 		status := "processed"
 		err = runCodex(ctx, cfg, req.Prompt)
 		if err != nil {
 			status = "error"
 		}
-		if err := store.UpdateRequest(ctx, req.ID, status, responseFor(err)); err != nil {
+		castEnd, endOK := captureCastTime(cfg.LiveCastPath)
+		castPath := ""
+		if startOK && endOK && cfg.RequestDir != "" && cfg.LiveCastPath != "" {
+			if castEnd < castStart {
+				castEnd = castStart
+			}
+			outPath := requestCastPath(cfg.RequestDir, req.ID)
+			if err := writeRequestCast(cfg.LiveCastPath, outPath, castStart, castEnd); err != nil {
+				log.Printf("worker cast write failed: %v", err)
+			} else {
+				castPath = requestCastRel(req.ID)
+			}
+		}
+		var endPtr *float64
+		if endOK {
+			endPtr = &castEnd
+		}
+		if err := store.UpdateRequestFinal(ctx, req.ID, status, responseFor(err), endPtr, castPath); err != nil {
 			log.Printf("worker update failed: %v", err)
 		}
 	}

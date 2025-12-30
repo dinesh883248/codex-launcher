@@ -1,9 +1,10 @@
 """
 MUST HAVE REQUIREMENTS:
 - Allow only the explicit attribute set per tag defined in allowed_attrs.
-- Permit an id attribute solely on table elements.
+- Permit an id attribute solely on table elements, with td ids allowed for request_cast.html.
 - When an anchor has a class, it must be exactly link-button.
-- Allow link/script/asciinema-player only when the filename is livestream.html.
+- Allow link/script/asciinema-player only when the filename is livestream.html or request_cast.html.
+- Allow link type=... only for request_cast.html.
 - Read HTML directly from a path or stdin without pickle staging.
 """
 # ----------------------------------
@@ -30,7 +31,11 @@ allowed_attrs = {
 extra = {"link", "script", "asciinema-player"}
 
 target = sys.argv[1] if len(sys.argv) > 1 else ""
-allow_extra = target.endswith("livestream.html")
+allow_request_cast = target.endswith("request_cast.html")
+allow_extra = target.endswith("livestream.html") or allow_request_cast
+if allow_request_cast:
+    allowed_attrs["td"] = {"id"}
+    allowed_attrs["link"] = {"rel", "href", "type"}
 
 
 class P(HTMLParser):

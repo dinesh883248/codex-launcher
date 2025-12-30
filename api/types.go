@@ -6,4 +6,7 @@ type Request struct {
 	Status    string
 	Response  string
 	CreatedAt string
+	CastStart *float64
+	CastEnd   *float64
+	CastPath  string
 }

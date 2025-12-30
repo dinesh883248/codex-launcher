@@ -1,0 +1,31 @@
+{{ define "request_cast" }}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Request Cast</title>
+<style>
+{{ .CSS }}
+</style>
+<link rel="stylesheet" type="text/css" href="/asciinema-player.css"/>
+<script src="/asciinema-player.min.js"></script>
+</head>
+<body>
+<table id="player" style="width: 380px;">
+<colgroup>
+<col style="width: 380px;"/>
+</colgroup>
+<tbody>
+<tr>
+<td id="demo">
+<script>
+AsciinemaPlayer.create("{{ .CastURL }}", document.getElementById("demo"), { controls: false });
+</script>
+</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
+{{ end }}

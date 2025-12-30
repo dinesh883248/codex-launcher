@@ -1,7 +1,7 @@
 """
 MUST HAVE REQUIREMENTS:
 - Accept only the allowed table-safe tags listed in this module.
-- Allow link/script/asciinema-player only when the filename is livestream.html.
+- Allow link/script/asciinema-player only when the filename is livestream.html or request_cast.html.
 - Allow inline style solely on table and col tags.
 - Inline styles must be width declarations in numeric px with no other CSS.
 - Read raw HTML from a provided path or stdin without pickle inputs.
@@ -49,7 +49,7 @@ allowed = {
 extra = {"link", "script", "asciinema-player"}
 
 target = sys.argv[1] if len(sys.argv) > 1 else ""
-allow_extra = target.endswith("livestream.html")
+allow_extra = target.endswith(("livestream.html", "request_cast.html"))
 
 
 # ----------------------------------

@@ -4,7 +4,7 @@ MUST HAVE REQUIREMENTS:
 - Accept stdin when no file path is provided by creating a temporary input file.
 - Treat tidy errors (return code > 1 or stderr containing 'Error') as failures.
 - Print the cleaned file path when tidy succeeds, even if warnings occurred.
-- Allow custom tags only when the filename is livestream.html.
+- Allow custom tags only when the filename is livestream.html or request_cast.html.
 """
 # ----------------------------------
 # Run tidy to emit normalized XHTML; warn-only ok
@@ -20,7 +20,11 @@ if not path:
     tmp_in.flush()
     path = tmp_in.name
 
-suffix = "livestream.html" if path.endswith("livestream.html") else ".html"
+suffix = ".html"
+if path.endswith("livestream.html"):
+    suffix = "livestream.html"
+elif path.endswith("request_cast.html"):
+    suffix = "request_cast.html"
 allow_extra = suffix != ".html"
 tmp_out = NamedTemporaryFile(delete=False, suffix=suffix)
 tmp_out.close()

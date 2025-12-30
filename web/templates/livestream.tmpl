@@ -11,18 +11,52 @@
 <link rel="stylesheet" href="/static/asciinema-player.css?v={{ .CSSVersion }}"/>
 <script src="/static/asciinema-player.min.js?v={{ .JSVersion }}"></script>
 <script>
-if (!customElements.get("asciinema-player")) {
-  customElements.define("asciinema-player", class extends HTMLElement {
-    connectedCallback() {
-      if (this._started || !window.AsciinemaPlayer) {
-        return;
-      }
-      this._started = true;
-      AsciinemaPlayer.create(this.getAttribute("src"), this, {
-        autoplay: this.hasAttribute("autoplay")
-      });
+function startPlayer() {
+  if (!window.AsciinemaPlayer) {
+    return;
+  }
+  var target = document.querySelector("#player td");
+  if (!target) {
+    return;
+  }
+  var src = "{{ .CastURL }}";
+  var url = new URL(src, window.location.href);
+  url.username = "";
+  url.password = "";
+  var opts = { autoPlay: true, autoplay: true, controls: false, preload: true };
+  if ({{ if .Streaming }}true{{ else }}false{{ end }}) {
+    var player = AsciinemaPlayer.create(
+      { url: url.toString(), driver: "eventsource" },
+      target,
+      opts
+    );
+    if (player && player.play) {
+      player.play();
     }
-  });
+    return;
+  }
+  var player = AsciinemaPlayer.create(url.toString(), target, opts);
+  if (!player || !player.getDuration || !player.seek) {
+    return;
+  }
+  var tries = 0;
+  function seekEnd() {
+    var duration = player.getDuration();
+    if (duration && duration > 0) {
+      player.seek(Math.max(0, duration - 1));
+      return;
+    }
+    tries += 1;
+    if (tries < 20) {
+      setTimeout(seekEnd, 300);
+    }
+  }
+  setTimeout(seekEnd, 300);
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startPlayer);
+} else {
+  startPlayer();
 }
 </script>
 </head>
@@ -33,7 +67,7 @@ if (!customElements.get("asciinema-player")) {
 </colgroup>
 <tbody>
 <tr>
-<td><asciinema-player src="{{ .CastURL }}" autoplay></asciinema-player></td>
+<td></td>
 </tr>
 </tbody>
 </table>
