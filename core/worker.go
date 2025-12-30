@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"almono/api"
@@ -172,12 +173,12 @@ func processEvent(event codexEvent) string {
 		}
 		switch item.Type {
 		case "reasoning":
-			return fmt.Sprintf("Thinking: %s", item.Text)
+			return fmt.Sprintf("Thinking: %s", truncate(item.Text, 100))
 		case "command_execution":
 			if item.Status == "completed" {
 				result := fmt.Sprintf("$ %s", item.Command)
 				if item.AggregatedOutput != "" {
-					result += fmt.Sprintf(" -> %s", item.AggregatedOutput)
+					result += fmt.Sprintf(" -> %s", truncate(item.AggregatedOutput, 100))
 				}
 				if item.ExitCode != nil && *item.ExitCode != 0 {
 					result += fmt.Sprintf(" (exit %d)", *item.ExitCode)
@@ -185,9 +186,9 @@ func processEvent(event codexEvent) string {
 				return result
 			}
 		case "agent_message":
-			return fmt.Sprintf("Response: %s", item.Text)
+			return fmt.Sprintf("Response: %s", truncate(item.Text, 200))
 		case "error":
-			return fmt.Sprintf("Error: %s", item.Message)
+			return fmt.Sprintf("Error: %s", truncate(item.Message, 100))
 		}
 	case "turn.completed":
 		if event.Usage != nil {
@@ -195,6 +196,17 @@ func processEvent(event codexEvent) string {
 		}
 	}
 	return ""
+}
+
+// truncate limits string length and adds ellipsis
+func truncate(s string, maxLen int) string {
+	// replace newlines with spaces for single-line display
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func responseFor(err error) string {
