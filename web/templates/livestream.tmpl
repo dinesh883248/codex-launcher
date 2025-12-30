@@ -20,22 +20,16 @@ function startPlayer() {
     return;
   }
   var src = "{{ .CastURL }}";
-  var url = new URL(src, window.location.href);
-  url.username = "";
-  url.password = "";
-  var opts = { autoPlay: true, autoplay: true, controls: false, preload: true };
+  var opts = { autoPlay: true, autoplay: true, controls: false, preload: true, fit: "width" };
   if ({{ if .Streaming }}true{{ else }}false{{ end }}) {
-    var player = AsciinemaPlayer.create(
-      { url: url.toString(), driver: "eventsource" },
+    AsciinemaPlayer.create(
+      { url: src, driver: "eventsource" },
       target,
       opts
     );
-    if (player && player.play) {
-      player.play();
-    }
     return;
   }
-  var player = AsciinemaPlayer.create(url.toString(), target, opts);
+  var player = AsciinemaPlayer.create(src, target, opts);
   if (!player || !player.getDuration || !player.seek) {
     return;
   }

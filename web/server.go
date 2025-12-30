@@ -171,7 +171,7 @@ func (s *Server) HandleLivestream(w http.ResponseWriter, r *http.Request) {
 		CastURL:    "/stream",
 		Streaming:  true,
 	}
-	if err := s.templates.ExecuteTemplate(w, "request_cast", view); err != nil {
+	if err := s.templates.ExecuteTemplate(w, "livestream", view); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
