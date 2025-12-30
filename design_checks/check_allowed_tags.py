@@ -44,6 +44,7 @@ allowed = {
     "button",
     "input",
     "textarea",
+    "iframe",
 }
 
 
@@ -64,9 +65,12 @@ class P(HTMLParser):
         for k, v in attrs:
             if k != "style":
                 continue
-            if tag != "table" and tag != "col":
-                self.bad = "inline style only allowed on table and col"
+            if tag not in ("table", "col", "iframe"):
+                self.bad = "inline style only allowed on table, col, iframe"
                 return
+            # iframe can have any style, table/col only width
+            if tag == "iframe":
+                continue
             s = "".join(v.split())
             if s.endswith(";"):
                 s = s[:-1]

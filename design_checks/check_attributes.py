@@ -22,6 +22,7 @@ allowed_attrs = {
     "textarea": {"name", "hidden", "rows", "disabled"},
     "a": {"href", "class"},
     "img": {"src"},
+    "iframe": {"src", "style"},
 }
 
 
