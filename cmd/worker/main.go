@@ -31,7 +31,7 @@ func main() {
 	tmuxBin := flag.String("tmux", "tmux", "tmux binary")
 	session := flag.String("session", "almono-worker", "tmux session name")
 	cols := flag.Int("cols", 80, "terminal columns for recording")
-	rows := flag.Int("rows", 80, "terminal rows for recording")
+	rows := flag.Int("rows", 72, "terminal rows for recording")
 	child := flag.Bool("child", false, "run worker loop (internal)")
 	flag.Parse()
 
@@ -93,6 +93,10 @@ func main() {
 		"-d",
 		"-s",
 		*session,
+		"-x",
+		strconv.Itoa(*cols),
+		"-y",
+		strconv.Itoa(*rows),
 		asciinemaPath,
 		"rec",
 		"-q",
@@ -115,6 +119,16 @@ func main() {
 	if err := recordCmd.Run(); err != nil {
 		log.Fatalf("tmux launch failed: %v", err)
 	}
+	_ = exec.Command(
+		*tmuxBin,
+		"resize-window",
+		"-t",
+		*session,
+		"-x",
+		strconv.Itoa(*cols),
+		"-y",
+		strconv.Itoa(*rows),
+	).Run()
 	log.Printf("worker tmux session started: %s", *session)
 }
 

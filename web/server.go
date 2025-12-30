@@ -1,7 +1,9 @@
 package web
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -19,6 +21,8 @@ type Server struct {
 	css       template.CSS
 	pageSize  int
 	staticFS  http.FileSystem
+	cssVer    string
+	jsVer     string
 }
 
 type RequestRow struct {
@@ -46,10 +50,12 @@ type CreateView struct {
 }
 
 type LivestreamView struct {
-	CSS       template.CSS
-	CastURL   string
-	Message   string
-	Streaming bool
+	CSS        template.CSS
+	CSSVersion string
+	JSVersion  string
+	CastURL    string
+	Message    string
+	Streaming  bool
 }
 
 func NewServer(svc *api.Service) (*Server, error) {
@@ -65,12 +71,22 @@ func NewServer(svc *api.Service) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	cssVer, err := assetHash("static/asciinema-player.css")
+	if err != nil {
+		return nil, err
+	}
+	jsVer, err := assetHash("static/asciinema-player.min.js")
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
 		templates: tmpl,
 		svc:       svc,
 		pageSize:  10,
 		css:       template.CSS(rawCSS),
 		staticFS:  http.FS(staticRoot),
+		cssVer:    cssVer,
+		jsVer:     jsVer,
 	}, nil
 }
 
@@ -132,8 +148,10 @@ func (s *Server) HandleLivestream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := LivestreamView{
-		CSS:     s.css,
-		CastURL: "/casts/" + api.LiveCastName(),
+		CSS:        s.css,
+		CSSVersion: s.cssVer,
+		JSVersion:  s.jsVer,
+		CastURL:    "/casts/" + api.LiveCastName(),
 	}
 	if err := s.templates.ExecuteTemplate(w, "livestream", view); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -180,4 +198,13 @@ func parseInt(val string, fallback int) int {
 		return fallback
 	}
 	return num
+}
+
+func assetHash(path string) (string, error) {
+	data, err := templatesFS.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%x", sum[:8]), nil
 }

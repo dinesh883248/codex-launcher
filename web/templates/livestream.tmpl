@@ -8,8 +8,8 @@
 <style>
 {{ .CSS }}
 </style>
-<link rel="stylesheet" href="/static/asciinema-player.css"/>
-<script src="/static/asciinema-player.min.js"></script>
+<link rel="stylesheet" href="/static/asciinema-player.css?v={{ .CSSVersion }}"/>
+<script src="/static/asciinema-player.min.js?v={{ .JSVersion }}"></script>
 <script>
 if (!customElements.get("asciinema-player")) {
   customElements.define("asciinema-player", class extends HTMLElement {
